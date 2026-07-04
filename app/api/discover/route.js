@@ -20,8 +20,29 @@ async function fetchWikiHit(query) {
   }
 }
 
-// A hit is trusted only if the article title shares a distinctive word with the
-// place name. This rejects false matches (e.g. a generic city article whose
+// Searches Wikimedia Commons files directly for an actual photo of the place.
+// This covers many lesser-known spots that lack a dedicated Wikipedia article.
+async function fetchCommonsHit(query) {
+  try {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800&origin=*`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'AuraTravel/1.0 (cultural travel discovery demo)' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pages = data?.query?.pages;
+    if (!pages) return null;
+    const first = Object.values(pages)[0];
+    const info = first?.imageinfo?.[0];
+    if (!info?.thumburl) return null;
+    return { title: first.title || '', thumb: info.thumburl };
+  } catch {
+    return null;
+  }
+}
+
+// A hit is trusted only if the article/file title shares a distinctive word with
+// the place name. This rejects false matches (e.g. a generic city article whose
 // lead photo would otherwise be reused for every place).
 function isRelevantHit(hit, placeName, cityName) {
   if (!hit) return false;
@@ -46,10 +67,26 @@ async function enrichWithImages(parsed, cityName) {
     items.map(async (item) => {
       if (!item || typeof item !== 'object') return;
       const name = item.name || item.imageKeywords || '';
-      const hit =
-        (await fetchWikiHit(`${item.imageKeywords || name} ${city}`)) ||
-        (await fetchWikiHit(`${name} ${city}`));
-      item.image = isRelevantHit(hit, name, city) ? hit.thumb : null;
+      const kw = item.imageKeywords || name;
+
+      // 1) Wikipedia article lead image — cleanest "hero" shots for landmarks.
+      const wiki =
+        (await fetchWikiHit(`${kw} ${city}`)) || (await fetchWikiHit(`${name} ${city}`));
+      if (isRelevantHit(wiki, name, city)) {
+        item.image = wiki.thumb;
+        return;
+      }
+
+      // 2) Wikimedia Commons file search — real photos of lesser-known places.
+      const commons =
+        (await fetchCommonsHit(`${name} ${city}`)) || (await fetchCommonsHit(`${kw} ${city}`));
+      if (isRelevantHit(commons, name, city)) {
+        item.image = commons.thumb;
+        return;
+      }
+
+      // 3) No trustworthy match — let the client use a keyword photo fallback.
+      item.image = null;
     })
   );
   return parsed;
