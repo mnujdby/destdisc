@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   CITIES,
@@ -37,7 +38,7 @@ export default function Home() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            Groq Engine Active
+            AI Route Engine
           </span>
         </div>
       </header>
@@ -67,22 +68,21 @@ export default function Home() {
 
           <div className="grid-destinations">
             {CITIES.map((city) => (
-              <div
+              <button
+                type="button"
                 key={city.slug}
                 className="dest-card"
                 onClick={() => openPlanner(city)}
                 id={`city-card-${city.slug}`}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openPlanner(city)}
               >
                 <div className="dest-image-container">
-                  <img
+                  <Image
                     src={city.image}
                     alt={`${city.name} skyline`}
                     className="dest-img"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     loading="lazy"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => {
                       if (!e.currentTarget.dataset.fallback) {
                         e.currentTarget.dataset.fallback = '1';
@@ -104,7 +104,7 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </section>
@@ -127,7 +127,7 @@ export default function Home() {
 
       <footer>
         <div className="container">
-          <p>&copy; {new Date().getFullYear()} AuraTravel. Powered by Groq Llama 3.3 + Wikimedia imagery.</p>
+          <p>&copy; {new Date().getFullYear()} AuraTravel. Groq-ready itinerary engine with Wikimedia imagery.</p>
         </div>
       </footer>
 
@@ -139,6 +139,7 @@ export default function Home() {
 }
 
 function PlannerModal({ city, onClose, router }) {
+  const closeButtonRef = useRef(null);
   const [duration, setDuration] = useState('2 days');
   const [budget, setBudget] = useState('mid-range');
   const [pace, setPace] = useState('balanced');
@@ -153,6 +154,7 @@ function PlannerModal({ city, onClose, router }) {
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
@@ -192,12 +194,21 @@ function PlannerModal({ city, onClose, router }) {
 
   return (
     <div className="modal-backdrop animate-fade-in" onClick={onClose}>
-      <div className="modal-card glass" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Plan a trip to ${city.name}`}>
+      <div
+        className="modal-card glass"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`planner-title-${city.slug}`}
+        aria-describedby={`planner-description-${city.slug}`}
+      >
         {/* Locked-city header */}
         <div className="modal-hero">
-          <img
+          <Image
             src={city.image}
             alt={city.name}
+            fill
+            sizes="640px"
             onError={(e) => {
               if (!e.currentTarget.dataset.fallback) {
                 e.currentTarget.dataset.fallback = '1';
@@ -206,7 +217,7 @@ function PlannerModal({ city, onClose, router }) {
             }}
           />
           <div className="modal-hero-overlay"></div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close planner">
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close planner" ref={closeButtonRef}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -220,8 +231,8 @@ function PlannerModal({ city, onClose, router }) {
               </svg>
               Destination locked
             </span>
-            <h3>{city.name}</h3>
-            <span className="modal-hero-tag">{city.tagline}</span>
+            <h3 id={`planner-title-${city.slug}`}>{city.name}</h3>
+            <span className="modal-hero-tag" id={`planner-description-${city.slug}`}>{city.tagline}</span>
           </div>
         </div>
 
@@ -276,6 +287,7 @@ function PlannerModal({ city, onClose, router }) {
                     type="button"
                     onClick={() => toggleInterest(interest)}
                     className={`pill ${isActive ? 'pill-active' : ''}`}
+                    aria-pressed={isActive}
                   >
                     {interest}
                   </button>

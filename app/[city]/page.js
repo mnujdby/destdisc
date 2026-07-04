@@ -1,8 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getCityBySlug, cityFallbackImage } from '../cities';
 
 // Prefer the real Wikipedia/Wikimedia image attached server-side; otherwise
@@ -32,45 +33,63 @@ function CityPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const cityName = city?.name || decodeURIComponent(String(params.city || '')).replace(/(^|\s)\S/g, (t) => t.toUpperCase());
-
-  const fetchItinerary = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setData(null);
-    try {
-      const interests = (searchParams.get('interests') || '').split(',').map((s) => s.trim()).filter(Boolean);
-      const res = await fetch('/api/discover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          city: cityName,
-          duration: searchParams.get('duration') || '2 days',
-          budget: searchParams.get('budget') || 'mid-range',
-          pace: searchParams.get('pace') || 'balanced',
-          travelers: searchParams.get('travelers') || 'friends or family',
-          tripGoal: searchParams.get('tripGoal') || '',
-          interests,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || json.error || 'Something went wrong');
-      setData(json);
-    } catch (err) {
-      setError({
-        message: err.message,
-        isKeyError: /Groq API Key|not set/i.test(err.message || ''),
-      });
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityName, searchParams]);
+  const duration = searchParams.get('duration') || '2 days';
+  const budget = searchParams.get('budget') || 'mid-range';
+  const pace = searchParams.get('pace') || 'balanced';
+  const travelers = searchParams.get('travelers') || 'friends or family';
+  const tripGoal = searchParams.get('tripGoal') || '';
+  const interestsParam = searchParams.get('interests') || '';
 
   useEffect(() => {
-    fetchItinerary();
-  }, [fetchItinerary]);
+    let cancelled = false;
+
+    async function loadItinerary() {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      setLoading(true);
+      setError(null);
+      setData(null);
+
+      try {
+        const interests = interestsParam.split(',').map((s) => s.trim()).filter(Boolean);
+        const res = await fetch('/api/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city: cityName,
+            duration,
+            budget,
+            pace,
+            travelers,
+            tripGoal,
+            interests,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || json.error || 'Something went wrong');
+        if (!cancelled) setData(json);
+      } catch (err) {
+        if (!cancelled) {
+          setError({
+            message: err.message,
+            isKeyError: /Groq API Key|not set/i.test(err.message || ''),
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadItinerary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [budget, cityName, duration, interestsParam, pace, reloadKey, travelers, tripGoal]);
 
   const heroImg = data?.attractions?.find((a) => a.image)?.image || city?.hero || cityFallbackImage(city, 1600, 700);
   const tripChips = [
@@ -105,10 +124,13 @@ function CityPage() {
 
       {/* City hero */}
       <section className="city-hero">
-        <img
+        <Image
           className="city-hero-img"
           src={heroImg}
           alt={cityName}
+          fill
+          priority
+          sizes="100vw"
           onError={(e) => {
             if (!e.currentTarget.dataset.fallback) {
               e.currentTarget.dataset.fallback = '1';
@@ -122,7 +144,7 @@ function CityPage() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            Live Groq itinerary
+            {data?.source === 'demo' ? 'Demo itinerary' : 'Live Groq itinerary'}
           </span>
           <h1>{cityName}</h1>
           {(data?.tagline || city?.tagline) && (
@@ -162,7 +184,7 @@ function CityPage() {
               <div className="env-alert glass" style={{ borderColor: 'rgba(239, 68, 68, 0.4)' }}>
                 <h3>Couldn&apos;t generate this route</h3>
                 <p>{error.message}</p>
-                <button className="btn btn-primary" onClick={fetchItinerary} style={{ marginTop: '8px' }}>Try again</button>
+                <button className="btn btn-primary" onClick={() => setReloadKey((key) => key + 1)} style={{ marginTop: '8px' }}>Try again</button>
               </div>
             )}
           </section>
@@ -248,9 +270,11 @@ function CityPage() {
                   {data.attractions.map((a, idx) => (
                     <div key={idx} className="detail-card has-image">
                       <div className="detail-card-media">
-                        <img
+                        <Image
                           src={placeImage(a, data.city, 100 + idx)}
                           alt={a.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
                           loading="lazy"
                           onError={(e) => {
                             if (!e.currentTarget.dataset.fallback) {
@@ -290,9 +314,11 @@ function CityPage() {
                   {data.hiddenGems.map((g, idx) => (
                     <div key={idx} className="detail-card has-image" style={{ borderTop: '2px solid var(--secondary)' }}>
                       <div className="detail-card-media">
-                        <img
+                        <Image
                           src={placeImage(g, data.city, 200 + idx)}
                           alt={g.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
                           loading="lazy"
                           onError={(e) => {
                             if (!e.currentTarget.dataset.fallback) {
@@ -380,7 +406,7 @@ function CityPage() {
 
       <footer>
         <div className="container">
-          <p>&copy; {new Date().getFullYear()} AuraTravel. Powered by Groq Llama 3.3 + Wikimedia imagery.</p>
+          <p>&copy; {new Date().getFullYear()} AuraTravel. Groq-ready itinerary engine with Wikimedia imagery.</p>
         </div>
       </footer>
     </div>

@@ -8,7 +8,7 @@
   --bg-color: hsl(160, 25%, 4%);
   --bg-gradient: radial-gradient(circle at 50% 0%, hsl(158, 30%, 9%) 0%, hsl(160, 28%, 4%) 80%);
   --text-color: hsl(150, 25%, 98%);
-  --text-muted: hsl(150, 12%, 62%);
+  --text-muted: hsl(150, 12%, 72%);
 
   --primary: hsl(145, 72%, 47%);
   --primary-glow: hsla(145, 72%, 47%, 0.32);
@@ -383,6 +383,14 @@ header {
   transform: translateY(0);
 }
 
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 /* Destinations Section */
 .destinations-section {
   padding: 60px 0;
@@ -407,6 +415,12 @@ header {
 }
 
 .dest-card {
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
   position: relative;
   height: 340px;
   overflow: hidden;
@@ -838,14 +852,18 @@ header {
   justify-content: center;
   padding: 40px 20px;
   overflow-y: auto;
-  background: rgba(4, 10, 8, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(4, 10, 8, 0.68);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .modal-card {
   width: 100%;
   max-width: 640px;
+  background: rgba(6, 16, 12, 0.68);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  border-color: rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg);
   overflow: hidden;
   animation: modalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -922,6 +940,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  background: rgba(6, 16, 12, 0.62);
 }
 
 .modal-grid {
@@ -969,6 +988,17 @@ header {
   background: var(--secondary);
   color: hsl(160, 40%, 6%);
   box-shadow: 0 0 15px var(--secondary-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* City page hero */
