@@ -2,12 +2,13 @@
   "name": "destdisc",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test app/api/discover/demo-data.test.mjs"
+    "test": "node --test app/api/discover/demo-data.test.mjs app/api/discover/route.test.mjs next.config.test.mjs"
   },
   "dependencies": {
     "next": "16.2.10",

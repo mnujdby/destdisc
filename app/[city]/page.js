@@ -104,6 +104,8 @@ function CityPage() {
       <div className="glow-blur-1"></div>
       <div className="glow-blur-2"></div>
 
+      <a href="#main-content" className="skip-link">Skip to itinerary content</a>
+
       <header>
         <div className="container nav-container">
           <Link href="/" className="logo">
@@ -160,10 +162,10 @@ function CityPage() {
         </div>
       </section>
 
-      <main className="container" style={{ paddingBottom: '40px' }}>
+      <main className="container" id="main-content" tabIndex={-1} style={{ paddingBottom: '40px' }}>
         {/* Error */}
         {error && (
-          <section className="animate-fade-in" style={{ marginTop: '32px' }}>
+          <section className="animate-fade-in" style={{ marginTop: '32px' }} role="alert" aria-live="assertive">
             {error.isKeyError ? (
               <div className="env-alert glass">
                 <h3>
@@ -192,7 +194,7 @@ function CityPage() {
 
         {/* Loading skeleton */}
         {loading && (
-          <section className="discovery-pane glass skeleton-container animate-fade-in" style={{ marginTop: '32px' }}>
+          <section className="discovery-pane glass skeleton-container animate-fade-in" style={{ marginTop: '32px' }} role="status" aria-live="polite" aria-label={`Loading itinerary for ${cityName}`}>
             <div className="shimmer-bg skeleton-title"></div>
             <div className="shimmer-bg skeleton-tagline"></div>
             <div className="shimmer-bg skeleton-text"></div>
@@ -208,7 +210,7 @@ function CityPage() {
 
         {/* Results */}
         {data && !loading && (
-          <section className="discovery-pane glass animate-fade-in" style={{ marginTop: '32px' }}>
+          <section className="discovery-pane glass animate-fade-in" style={{ marginTop: '32px' }} aria-live="polite">
             {/* Cultural Overview */}
             {data.culturalOverview && (
               <div className="overview-card">
@@ -241,12 +243,12 @@ function CityPage() {
                         <span className="badge badge-secondary">Explore</span>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-                        {[['🌅 Morning', 'var(--accent)', day.morning], ['☀️ Afternoon', 'var(--secondary)', day.afternoon], ['🌙 Evening', 'var(--primary)', day.evening]].map(([label, color, slot], i) =>
+                        {[['Morning', 'var(--accent)', day.morning], ['Afternoon', 'var(--secondary)', day.afternoon], ['Evening', 'var(--primary)', day.evening]].map(([label, color, slot], i) =>
                           slot ? (
                             <div key={i} style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px' }}>
                               <strong style={{ color, fontSize: '0.85rem', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>{label}</strong>
                               <p style={{ fontSize: '0.9rem', color: '#fff', marginBottom: '8px' }}>{slot.activity}</p>
-                              {slot.tip && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>💡 {slot.tip}</p>}
+                              {slot.tip && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}><span aria-hidden="true">Tip: </span>{slot.tip}</p>}
                             </div>
                           ) : null
                         )}
@@ -331,7 +333,7 @@ function CityPage() {
                       <div className="detail-card-body">
                         <h4>{g.name}</h4>
                         <p style={{ fontSize: '0.85rem', color: 'var(--secondary)', marginBottom: '8px', fontWeight: 600 }}>
-                          📍 {g.location || 'Local Neighborhood'}
+                          <span aria-hidden="true">Location: </span>{g.location || 'Local Neighborhood'}
                         </p>
                         <p>{g.whySpecial}</p>
                         {g.localSecret && (
@@ -364,7 +366,7 @@ function CityPage() {
                     <div key={idx} className="detail-card">
                       <h4>{ev.name}</h4>
                       <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '4px 10px', marginBottom: '12px' }}>
-                        📅 {ev.season}
+                        <span aria-hidden="true">Season: </span>{ev.season}
                       </span>
                       <p>{ev.description}</p>
                     </div>

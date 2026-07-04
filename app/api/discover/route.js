@@ -1,5 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server.js';
 import { createDemoItinerary, normalizeDiscoverPayload, parseDurationDays } from './demo-data.mjs';
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const rateLimitBuckets = new Map();
 
 // Fetches the top Wikipedia search hit (title + page image) for a query.
 // No API key required. Returns null on any miss.
@@ -102,8 +106,48 @@ async function demoResponse(payload) {
   return NextResponse.json(demo);
 }
 
-export async function POST(request) {
+export function getClientId(request) {
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwardedFor || request.headers.get('x-real-ip') || 'local';
+}
+
+export function checkRateLimit(clientId, now = Date.now()) {
+  const bucket = rateLimitBuckets.get(clientId);
+
+  if (!bucket || now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitBuckets.set(clientId, { count: 1, startedAt: now });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1 };
+  }
+
+  if (bucket.count >= RATE_LIMIT_MAX_REQUESTS) {
+    const retryAfter = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - bucket.startedAt)) / 1000);
+    return { allowed: false, retryAfter, remaining: 0 };
+  }
+
+  bucket.count += 1;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - bucket.count };
+}
+
+export function clearRateLimitBuckets() {
+  rateLimitBuckets.clear();
+}
+
+export async function handleDiscoverRequest(request) {
   try {
+    const limit = checkRateLimit(getClientId(request));
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before generating another route.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(limit.retryAfter),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
     const payload = normalizeDiscoverPayload(await request.json());
     const {
       city,
@@ -121,7 +165,9 @@ export async function POST(request) {
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey || apiKey === 'YOUR_GROQ_API_KEY_HERE') {
-      return demoResponse(payload);
+      const response = await demoResponse(payload);
+      response.headers.set('X-RateLimit-Remaining', String(limit.remaining));
+      return response;
     }
 
     const systemPrompt = `You are a world-class travel planner, cultural historian, and local storyteller.
@@ -222,7 +268,9 @@ Note: The "days" array in the itinerary object should contain exactly ${parseDur
     if (!groqResponse.ok) {
       const errorText = await groqResponse.text();
       console.error('Groq API Error:', errorText);
-      return demoResponse(payload);
+      const response = await demoResponse(payload);
+      response.headers.set('X-RateLimit-Remaining', String(limit.remaining));
+      return response;
     }
 
     const data = await groqResponse.json();
@@ -232,9 +280,15 @@ Note: The "days" array in the itinerary object should contain exactly ${parseDur
     // Enrich with real Wikipedia/Wikimedia photos for each place.
     await enrichWithImages(parsedContent, city);
 
-    return NextResponse.json(parsedContent);
+    return NextResponse.json(parsedContent, {
+      headers: { 'X-RateLimit-Remaining': String(limit.remaining) },
+    });
   } catch (error) {
     console.error('API Error:', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
+}
+
+export async function POST(request) {
+  return handleDiscoverRequest(request);
 }

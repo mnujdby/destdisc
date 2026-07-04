@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   CITIES,
@@ -26,14 +27,16 @@ export default function Home() {
       <div className="glow-blur-1"></div>
       <div className="glow-blur-2"></div>
 
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+
       <header>
         <div className="container nav-container">
-          <a href="#" className="logo">
+          <Link href="/" className="logo" aria-label="AuraTravel home">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             AuraTravel
-          </a>
+          </Link>
           <span className="badge badge-primary">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -43,7 +46,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container">
+      <main className="container" id="main-content" tabIndex={-1}>
         {/* Hero Section */}
         <section className="hero animate-fade-in-up">
           <span className="badge badge-accent" style={{ marginBottom: '16px' }}>
@@ -139,6 +142,7 @@ export default function Home() {
 }
 
 function PlannerModal({ city, onClose, router }) {
+  const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
   const [duration, setDuration] = useState('2 days');
   const [budget, setBudget] = useState('mid-range');
@@ -148,9 +152,39 @@ function PlannerModal({ city, onClose, router }) {
   const [selectedInterests, setSelectedInterests] = useState(['Heritage walks', 'Food trails', 'Hidden gems']);
   const [submitting, setSubmitting] = useState(false);
 
-  // Close on Escape + lock background scroll while open.
+  // Close on Escape, trap keyboard focus, and lock background scroll while open.
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const previouslyFocused = document.activeElement;
+    const focusableSelector = [
+      'a[href]',
+      'button:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      'input:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key !== 'Tab' || !modalRef.current) return;
+      const focusable = Array.from(modalRef.current.querySelectorAll(focusableSelector));
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -158,6 +192,7 @@ function PlannerModal({ city, onClose, router }) {
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.();
     };
   }, [onClose]);
 
@@ -195,6 +230,7 @@ function PlannerModal({ city, onClose, router }) {
   return (
     <div className="modal-backdrop animate-fade-in" onClick={onClose}>
       <div
+        ref={modalRef}
         className="modal-card glass"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -305,6 +341,9 @@ function PlannerModal({ city, onClose, router }) {
               </svg>
             )}
           </button>
+          <p className="sr-only" aria-live="polite">
+            {submitting ? `Generating itinerary for ${city.name}` : 'Planner ready'}
+          </p>
         </form>
       </div>
     </div>
